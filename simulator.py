@@ -15,26 +15,57 @@ with open('test.json', 'r') as data_file:
 """
 Initialise the database structure
 """
-con = lite.connect('simulationDatabase.db')
-with con:
-    cur = con.cursor()
-    #Create the tables
-    cur.execute("CREATE TABLE IF NOT EXISTS Agent(Name TEXT);")
-    #Unique so that we don't enter the same ID twice
-    cur.execute("CREATE TABLE IF NOT EXISTS Resource(Id TEXT, UNIQUE(Id));")
-    cur.execute("CREATE TABLE IF NOT EXISTS Attribute(name TEXT, value TEXT, ResourceId TEXT, UNIQUE(name,value,ResourceId));")
-    cur.execute("CREATE TABLE IF NOT EXISTS Relation(name TEXT, side1ID TEXT, side2ID TEXT);")
-    con.commit()
+def init_database():
+    con = lite.connect('deployment.db')
+    with con:
+        cur = con.cursor()
+        #Create the tables
+        cur.execute("CREATE TABLE IF NOT EXISTS Agent(Name TEXT, UNIQUE(Name));")
+        #Unique so that we don't enter the same ID twice
+        cur.execute("CREATE TABLE IF NOT EXISTS Resource(Id TEXT, UNIQUE(Id));")
+        cur.execute("CREATE TABLE IF NOT EXISTS Attribute(name TEXT, value TEXT, ResourceId TEXT, UNIQUE(name,value,ResourceId));")
+        cur.execute("CREATE TABLE IF NOT EXISTS Relation(name TEXT, side1ID TEXT, side2ID TEXT);")
+        con.commit()
+
+init_database()
+
+"""
+Write a resource to the database
+Returns the written resource
+"""
+def write_to_database(resource):
+    con = lite.connect('deployment.db')
+    print("Resource with id %s  written" % resource['id'])
+
+    with con:
+        cur = con.cursor()
+        for attr,val in resource.items():
+            if(attr == 'id'):
+                #Ignore so that we continue if the same Id is entered again
+                cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
+            else:
+                cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), id))
+
+    return resource
+
 
 
 """
-Look for the different agents
+Look for the different agents and write them in the database
 """
 agent_list = set()
 for res in range(0, len(parsed_json)):
     id = parsed_json[res]['id']
     parsed_id = resources.Id.parse_id(id)
-    agent_list.add(parsed_id.get_agent_name())
+    agent_name = parsed_id.get_agent_name()
+    agent_list.add(agent_name)
+
+    #write into db
+    con = lite.connect('deployment.db')
+    with con:
+        cur = con.cursor()
+        #Ignore so that we continue if the same Id is entered again
+        cur.execute("INSERT OR IGNORE INTO Agent VALUES(?)", (agent_name,))
 
 """
 Group resources per agent
@@ -43,27 +74,51 @@ agent_to_res = dict()
 for agent in agent_list:
     agent_to_res[agent] = []
 
-print("Agent to res: %s " % agent_to_res)
+#print("Agent to res: %s " % agent_to_res)
 for res in range(0, len(parsed_json)):
     id = parsed_json[res]['id'] 
     res_agent = resources.Id.parse_id(id).get_agent_name()
-    print("Agent key: %s " % res_agent)
+    #print("Agent key: %s " % res_agent)
     agent_to_res[res_agent].append(parsed_json[res])
 
-"""
-Per agent, write the resources to the database
-"""
+def finished_deploying(agent_res_dict):
+    for agent in agent_res_dict.keys():
+        print("Checking if agent %s has resources left to deploy." % agent)
+        if any(resource['requires'] for resource in agent_res_dict[agent]):
+            print("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
+            return False
 
-#with con:
-#    cur = con.cursor()
-#
-#    for res in range(0, len(parsed_json)):
-#        id = parsed_json[res]['id'] 
-#        for attr,val in parsed_json[res].items():
-#            print("Attribute %s \t Value: %s Value-type : %s" % (attr,val, type(val)))
-#            if(attr == 'id'):
-#                #Ignore so that we continue if the same Id is entered again
-#                cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
-#            else:
-#                cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), id))
+    return True
+
+"""
+The simulation itself
+"""
+#as long as not everything has been deployed
+while not finished_deploying(agent_to_res):
+    #deploy the resources without requirements in every agent
+    for agent in agent_list:
+        print("Deploying resources for agent %s." % agent)
+        res_list = agent_to_res[agent]
+        #by getting the list of resources with requirements, and deploying them
+        no_reqs = [write_to_database(res) for res in res_list if not res['requires']]
+        #Then remove the written resources from the requirements of the remaining resources
+        for agent in agent_list:
+            #and getting those resources who do have requirements.
+            reqs = [x for x in res_list if x not in no_reqs]
+            print("Resources without requirements: %s \n Resources with requirements: %s" % (len(no_reqs), len(reqs)))
+            for res in reqs:
+                #by first checking if the resource is a required resource
+                for possible_req in no_reqs:
+                    #and removing if that is the case
+                    print("Checking if %s can be removed from the requirements of %s." % (possible_req['id'], res['id']))
+                    if possible_req['id'] in res['requires']:
+                        print("Removed %s from the requirements of %s." % (possible_req, res))
+                        res['requires'].remove(possible_req['id'])
+            agent_to_res[agent] = reqs
+
+        #We should also remove it from the requirements of other agents' resources
+
+        #In the end we remove the newly deployed resources from the resource list of the agent.
+
+
 ##select ResourceId, name, value FROM Attribute, Resource where Attribute.ResourceId = Resource.Id order by ResourceId asc;
