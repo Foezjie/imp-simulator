@@ -84,7 +84,7 @@ for res in range(0, len(parsed_json)):
 def finished_deploying(agent_res_dict):
     for agent in agent_res_dict.keys():
         print("Checking if agent %s has resources left to deploy." % agent)
-        if any(resource['requires'] for resource in agent_res_dict[agent]):
+        if any(agent_res_dict[agent] for agent in agent_to_res.keys()):
             print("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
             return False
 
@@ -99,26 +99,24 @@ while not finished_deploying(agent_to_res):
     for agent in agent_list:
         print("Deploying resources for agent %s." % agent)
         res_list = agent_to_res[agent]
-        #by getting the list of resources with requirements, and deploying them
+        #by getting the list of resources without requirements, and deploying them
         no_reqs = [write_to_database(res) for res in res_list if not res['requires']]
-        #Then remove the written resources from the requirements of the remaining resources
         for agent in agent_list:
             #and getting those resources who do have requirements.
-            reqs = [x for x in res_list if x not in no_reqs]
+            reqs = [x for x in agent_to_res[agent] if x not in no_reqs]
             print("Resources without requirements: %s \n Resources with requirements: %s" % (len(no_reqs), len(reqs)))
+            #Then remove the written resources from the requirements of the remaining resources
             for res in reqs:
-                #by first checking if the resource is a required resource
                 for possible_req in no_reqs:
-                    #and removing if that is the case
                     print("Checking if %s can be removed from the requirements of %s." % (possible_req['id'], res['id']))
                     if possible_req['id'] in res['requires']:
                         print("Removed %s from the requirements of %s." % (possible_req, res))
                         res['requires'].remove(possible_req['id'])
+
+            #In the end we remove the newly deployed resources from the resource list of the agent.
             agent_to_res[agent] = reqs
 
-        #We should also remove it from the requirements of other agents' resources
 
-        #In the end we remove the newly deployed resources from the resource list of the agent.
 
 
 ##select ResourceId, name, value FROM Attribute, Resource where Attribute.ResourceId = Resource.Id order by ResourceId asc;
