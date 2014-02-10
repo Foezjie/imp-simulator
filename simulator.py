@@ -2,12 +2,18 @@
 import sys
 import sqlite3 as lite
 import json
+import logging
 
 from Imp import app
 from Imp import resources
 
 #if len(sys.argv) != 2:
 #    sys.exit('Incorrect number of arguments given.\nOnly a file containing the json data can be given.\n')
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+loghandler = logging.FileHandler('/tmp/simlog')
+logger.addHandler(loghandler)
 
 with open('test.json', 'r') as data_file:    
     parsed_json = json.loads(data_file.read())
@@ -29,14 +35,16 @@ def init_database():
 
 init_database()
 
+def valid_deployment(attr, val):
+    return True
+
 """
 Write a resource to the database
 Returns the written resource
+Checks doe hier.
 """
 def write_to_database(resource):
     con = lite.connect('deployment.db')
-    print("Resource with id %s  written" % resource['id'])
-
     with con:
         cur = con.cursor()
         for attr,val in resource.items():
@@ -44,10 +52,14 @@ def write_to_database(resource):
                 #Ignore so that we continue if the same Id is entered again
                 cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
             else:
-                cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), id))
+                #First check if there would be no errors during the deployment of this resource
+                if valid_deployment(attr,val):
+                    logger.info("Possible deployment of attr: %s and val %s" % (attr, str(val)))
+                    cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), id))
+
+    logger.info("Resource with id %s  written" % resource['id'])
 
     return resource
-
 
 
 """
@@ -83,9 +95,9 @@ for res in range(0, len(parsed_json)):
 
 def finished_deploying(agent_res_dict):
     for agent in agent_res_dict.keys():
-        print("Checking if agent %s has resources left to deploy." % agent)
+        logger.info("Checking if agent %s has resources left to deploy." % agent)
         if any(agent_res_dict[agent] for agent in agent_to_res.keys()):
-            print("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
+            logger.info("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
             return False
 
     return True
@@ -97,20 +109,20 @@ The simulation itself
 while not finished_deploying(agent_to_res):
     #deploy the resources without requirements in every agent
     for agent in agent_list:
-        print("Deploying resources for agent %s." % agent)
+        logger.info("Deploying resources for agent %s." % agent)
         res_list = agent_to_res[agent]
         #by getting the list of resources without requirements, and deploying them
         no_reqs = [write_to_database(res) for res in res_list if not res['requires']]
         for agent in agent_list:
             #and getting those resources who do have requirements.
             reqs = [x for x in agent_to_res[agent] if x not in no_reqs]
-            print("Resources without requirements: %s \n Resources with requirements: %s" % (len(no_reqs), len(reqs)))
+            logger.info("Resources without requirements: %s \n Resources with requirements: %s" % (len(no_reqs), len(reqs)))
             #Then remove the written resources from the requirements of the remaining resources
             for res in reqs:
                 for possible_req in no_reqs:
-                    print("Checking if %s can be removed from the requirements of %s." % (possible_req['id'], res['id']))
+                    logger.info("Checking if %s can be removed from the requirements of %s." % (possible_req['id'], res['id']))
                     if possible_req['id'] in res['requires']:
-                        print("Removed %s from the requirements of %s." % (possible_req, res))
+                        logger.info("Removed %s from the requirements of %s." % (possible_req, res))
                         res['requires'].remove(possible_req['id'])
 
             #In the end we remove the newly deployed resources from the resource list of the agent.
