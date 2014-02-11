@@ -42,8 +42,8 @@ init_database()
 
 def valid_deployment(resource):
 
-    res_type = resources.Id.parse_id(id).get_entity_type()
-    logger.info("Res type: %s" % res_type)
+    res_type = resources.Id.parse_id(resource['id']).get_entity_type()
+    logger.info("Resource: %s\nRes type: %s" % (resource,res_type))
 
     con = lite.connect('deployment.db')
 

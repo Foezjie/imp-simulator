@@ -1437,6 +1437,7 @@
 /etc/logrotate.d
 /etc/sysctl.d
 /etc/sudoers.d
+/etc/imp
 /etc/xdg
 /etc/xdg/systemd
 /etc/xdg/autostart
