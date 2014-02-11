@@ -3,6 +3,8 @@ import sys
 import sqlite3 as lite
 import json
 import logging
+import os
+from random import shuffle
 
 from Imp import app
 from Imp import resources
@@ -17,6 +19,9 @@ logger.addHandler(loghandler)
 
 with open('test.json', 'r') as data_file:    
     parsed_json = json.loads(data_file.read())
+
+filesystem = [line.strip() for line in open('filesystem')]
+
 
 """
 Initialise the database structure
@@ -35,7 +40,37 @@ def init_database():
 
 init_database()
 
-def valid_deployment(attr, val):
+def valid_deployment(resource):
+
+    res_type = resources.Id.parse_id(id).get_entity_type()
+    logger.info("Res type: %s" % res_type)
+
+    con = lite.connect('deployment.db')
+
+    with con:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM Resource")
+        rows = cur.fetchall()
+        directories = [resources.Id.parse_id(row[0]).get_attribute_value() for row in rows]
+
+        if res_type == "std::File":
+            logger.info("Checking for valid File deployment")
+            logger.info("File path: %s " % resource['path'])
+            parent_folder = os.path.dirname(resource['path'])
+            logger.info("Directories: %s" % directories)
+            if not (parent_folder in filesystem or parent_folder in directories):
+                logger.error("Parent folder doesn't exist! Resource not deployed")
+
+        elif res_type == "std::Service":
+            logger.info("Checking for valid Service deployment")
+
+        elif res_type == "std::Package":
+            logger.info("Checking for valid Package deployment")
+
+        elif res_type == "std::Directory":
+            logger.info("Checking for valid Directory deployment")
+            logger.info("dirpath: %s " % resource['path'])
+
     return True
 
 """
@@ -47,17 +82,17 @@ def write_to_database(resource):
     con = lite.connect('deployment.db')
     with con:
         cur = con.cursor()
-        for attr,val in resource.items():
-            if(attr == 'id'):
-                #Ignore so that we continue if the same Id is entered again
-                cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
-            else:
-                #First check if there would be no errors during the deployment of this resource
-                if valid_deployment(attr,val):
-                    logger.info("Possible deployment of attr: %s and val %s" % (attr, str(val)))
+        if valid_deployment(resource):
+            for attr,val in resource.items():
+                if(attr == 'id'):
+                    #Ignore so that we continue if the same Id is entered again
+                    cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
+                else:
+                    #First check if there would be no errors during the deployment of this resource
                     cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), id))
-
-    logger.info("Resource with id %s  written" % resource['id'])
+            logger.info("Resource with id %s  written" % resource['id'])
+        else:
+            logger.error("Tried to deploy resource but failed")
 
     return resource
 
@@ -86,11 +121,9 @@ agent_to_res = dict()
 for agent in agent_list:
     agent_to_res[agent] = []
 
-#print("Agent to res: %s " % agent_to_res)
 for res in range(0, len(parsed_json)):
     id = parsed_json[res]['id'] 
     res_agent = resources.Id.parse_id(id).get_agent_name()
-    #print("Agent key: %s " % res_agent)
     agent_to_res[res_agent].append(parsed_json[res])
 
 def finished_deploying(agent_res_dict):
