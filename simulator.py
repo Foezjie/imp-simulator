@@ -23,7 +23,7 @@ with open('test.json', 'r') as data_file:
 filesystem = [line.strip() for line in open('filesystem')]
 
 deployment_db = lite.connect('deployment.db')
-pkgdatata_db = lite.connect('pkgfiles.sqlite')
+pkgdatata_db = lite.connect('repodata.sqlite')
 
 """
 Initialise the database structure
@@ -65,7 +65,7 @@ def valid_deployment(resource):
         srv_name = resources.Id.parse_id(resource['id']).get_attribute_value()
         with pkgdatata_db:
             pkg_cur = pkgdatata_db.cursor()
-            pkg_cur.execute("SELECT * FROM pkgdata WHERE name LIKE ?", srv_name)
+            pkg_cur.execute("SELECT * FROM repodata WHERE name LIKE (?)", (srv_name,))
             srv_files = pkg_cur.fetchall()
 
 
@@ -99,7 +99,7 @@ def write_to_database(resource):
         #First check if there would be no errors during the deployment of this resource
         if valid_deployment(resource):
             for attr, val in resource.items():
-                if attr == 'id' :
+                if attr == 'id':
                     depl_cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
                 else:
                     depl_cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), resource['id']))
@@ -107,24 +107,23 @@ def write_to_database(resource):
 
             #Deploy additional resources found in pkginfo
             if res_type == "std::Package":
+                logger.info("Deploying files for package with id %s " % resource['id'])
                 with pkgdatata_db:
                     pkg_cur = pkgdatata_db.cursor()
-                    pkg_cur.execute("SELECT * FROM pkgdata WHERE name LIKE (?)", (res_name,))
-                    pkg_files = []
+                    pkg_cur.execute("SELECT * FROM repodata WHERE name LIKE (?)", (res_name,))
                     rows = pkg_cur.fetchall()
-                    pkg_files = []
-                    for row in rows:
-                        pkg_files.append(filenames_to_files(row[2], row[3]))
+                    pkg_files = [filenames_to_files(row[1], row[2]) for row in rows]
                     #flatten
                     pkg_files = [item for sublist in pkg_files for item in sublist]
-
+                    logger.info("Files in pkg: %s" % pkg_files)
                     #The id was already written, now write extra path Attributes
                     for file in pkg_files:
                         depl_cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", ("path", file, resource['id']))
 
-
         else:
             logger.error("Tried to deploy resource but failed")
+
+        deployment_db.commit()
 
     return resource
 
