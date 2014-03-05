@@ -79,6 +79,7 @@ def valid_deployment(resource):
 
     elif res_type == "std::Package":
         logger.info("Checking for valid Package deployment")
+        return True
 
     elif res_type == "std::Directory":
         logger.info("Checking for valid Directory deployment")
