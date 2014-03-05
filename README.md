@@ -24,19 +24,14 @@ Er wordt voor elke agent geprobeerde alle resources te deployen die geen require
 De resources die succesvol gedeployed worden, worden dan verwijderd uit de (mogelijke) requirements van de overige resources.
 
 Voordat een resource gedeployed wordt checkt de simulator of de deployment valide is. 
-De regels hiervoor verschillen per resource:  
-
-  Files en Directories: de parent folder moet bestaan
-  
-            ofwel moet deze reeds gedeployed zijn en dus staan in de deployment database
-            
-            ofwel is de parent folder een die behoort tot het besturingssysteem
-            
+De regels hiervoor verschillen per resource: 
+  Files en Directories: de parent folder moet bestaan.
+            Ofwel moet deze reeds gedeployed zijn en dus staan in de deployment database
+            ofwel is de parent folder een die behoort tot het besturingssysteem.
               Een lijst van standaard mappen staat in het bestand filesystem
               
   Services:
     De packages die horen bij de service moeten al aanwezig zijn in de deployment database.
-    
     De simulator weet welke files een service nodig heeft dankzij de pkgdata database. (Uitleg over hoe deze opgesteld werd onderaan)
     
   Packages: worden altijd gedeployed aangezien de package manager er voor verantwoordelijk is dat packages goed kunnen gedeployed worden, niet IMP
@@ -47,9 +42,11 @@ Opstellen van de pkgdata database:
 2. Download de bestanden die eindigen op "primary.sqlite.bz2" en "filelists.sqlite.bz2"
 3. bzcat beide bestanden naar respectievelijk "primary.sqlite" en "filelists.sqlite"
 4. 
+```
 >sqlite3 repodata.sqlite
 sqlite> attach database 'filelists.sqlite' as filelists;
 sqlite> attach database 'primary.sqlite' as prim;
 sqlite> create table pkgdata as select name, dirname, filenames from prim.packages, filelists.filelist where packages.pkgKey=filelist.pkgKey;
+```
 
 
