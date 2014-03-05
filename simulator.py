@@ -4,9 +4,8 @@ import sqlite3 as lite
 import json
 import logging
 import os
-from random import shuffle
+import collections
 
-from Imp import app
 from Imp import resources
 
 #if len(sys.argv) != 2:
@@ -59,6 +58,7 @@ def valid_deployment(resource):
         logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
             logger.error("Parent folder doesn't exist! File not deployed")
+            return False
 
     elif res_type == "std::Service":
         logger.info("Checking for valid Service deployment")
@@ -66,8 +66,16 @@ def valid_deployment(resource):
         with pkgdatata_db:
             pkg_cur = pkgdatata_db.cursor()
             pkg_cur.execute("SELECT * FROM repodata WHERE name LIKE (?)", (srv_name,))
-            srv_files = pkg_cur.fetchall()
+            req_files = pkg_cur.fetchall()
 
+        with deployment_db:
+            depl_cur = deployment_db.cursor()
+            depl_cur.execute("SELECT * FROM Resource where name LIKE (?)", (srv_name,))
+            present_files = pkg_cur.fetchall()
+
+            if not collections.Counter(req_files) == collections.Counter(present_files):
+                logger.error("Not all required files were present. Service not deployed")
+                return False
 
     elif res_type == "std::Package":
         logger.info("Checking for valid Package deployment")
