@@ -25,13 +25,20 @@ De resources die succesvol gedeployed worden, worden dan verwijderd uit de (moge
 
 Voordat een resource gedeployed wordt checkt de simulator of de deployment valide is. 
 De regels hiervoor verschillen per resource:  
+
   Files en Directories: de parent folder moet bestaan
+  
             ofwel moet deze reeds gedeployed zijn en dus staan in de deployment database
+            
             ofwel is de parent folder een die behoort tot het besturingssysteem
+            
               Een lijst van standaard mappen staat in het bestand filesystem
+              
   Services:
     De packages die horen bij de service moeten al aanwezig zijn in de deployment database.
+    
     De simulator weet welke files een service nodig heeft dankzij de pkgdata database. (Uitleg over hoe deze opgesteld werd onderaan)
+    
   Packages: worden altijd gedeployed aangezien de package manager er voor verantwoordelijk is dat packages goed kunnen gedeployed worden, niet IMP
 
 Opstellen van de pkgdata database:
