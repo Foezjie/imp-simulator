@@ -4,15 +4,11 @@ import sqlite3 as lite
 import json
 import logging
 import os
-import collections
 
 from Imp import app
 from Imp import resources
 
-#if len(sys.argv) != 2:
-#    sys.exit('Incorrect number of arguments given.\nOnly a file containing the json data can be given.\n')
-
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 loghandler = logging.FileHandler('/tmp/simlog')
 logger.addHandler(loghandler)
@@ -36,7 +32,6 @@ def init_database():
         #Unique so that we don't enter the same ID twice
         depl_cur.execute("CREATE TABLE IF NOT EXISTS Resource(Id TEXT, UNIQUE(Id));")
         depl_cur.execute("CREATE TABLE IF NOT EXISTS Attribute(name TEXT, value TEXT, ResourceId TEXT, UNIQUE(name,value,ResourceId));")
-        depl_cur.execute("CREATE TABLE IF NOT EXISTS Relation(name TEXT, side1ID TEXT, side2ID TEXT);")
         deployment_db.commit()
 
 init_database()
@@ -62,23 +57,32 @@ def valid_deployment(resource):
             return False
 
     elif res_type == "std::Service":
-        logger.info("Checking for valid Service deployment")
-        srv_name = resources.Id.parse_id(resource['id']).get_attribute_value()
-        with pkgdatata_db:
-            pkg_cur = pkgdatata_db.cursor()
-            pkg_cur.execute("SELECT * FROM pkgdata WHERE name LIKE (?)", (srv_name,))
-            req_files = pkg_cur.fetchall()
+        if resource['state'] == "stopped":
+            #A stopped service doesn't really have to be deployed.
+            #Workaround mainly for firewalld in the big json
+            return True
+        else:
+            logger.info("Checking for valid Service deployment")
+            srv_name = resources.Id.parse_id(resource['id']).get_attribute_value()
+            with pkgdatata_db:
+                pkg_cur = pkgdatata_db.cursor()
+                pkg_cur.execute("SELECT * FROM pkgdata WHERE name LIKE (?)", (srv_name,))
+                req_files = pkg_cur.fetchall()
+                req_files = [filenames_to_files(row[1], row[2]) for row in req_files]
+                #flatten
+                req_files = [item for sublist in req_files for item in sublist]
 
-        with deployment_db:
-            depl_cur = deployment_db.cursor()
-            #depl_cur.execute("SELECT * FROM Resource where name LIKE (?)", (srv_name,))
-            depl_cur.execute("SELECT * FROM Resource where Id LIKE (?)", (srv_name,))
-            present_files = pkg_cur.fetchall()
-
-            if not collections.Counter(req_files) == collections.Counter(present_files):
-                logger.error("Not all required files were present. Service %s not deployed" % resource['id'])
-                logger.error("Req files: %s\nPresent files: %s" % (req_files, present_files))
-                return False
+            with deployment_db:
+                depl_cur = deployment_db.cursor()
+                #depl_cur.execute("SELECT * FROM Resource where name LIKE (?)", (srv_name,))
+                depl_cur.execute('select value from Attribute where ResourceId glob "*%s*" and name like "path"' % resource['name'])
+                #depl_cur.execute("SELECT value FROM Attribute WHERE ResourceId LIKE (?) AND name LIKE (?)", (resource['id'], "path"))
+                present_files = depl_cur.fetchall()
+                present_files = [file[0] for file in present_files]
+                if not all([req_file in present_files for req_file in req_files]):
+                    logger.error("Not all required files were present. Service %s not deployed" % resource['id'])
+                    logger.error("Req files: %s\nPresent files: %s" % (req_files, present_files))
+                    return False
 
     elif res_type == "std::Package":
         logger.info("Checking for valid Package deployment")
@@ -114,7 +118,7 @@ def write_to_database(resource):
                     depl_cur.execute("INSERT OR IGNORE INTO Resource VALUES(?)", (val,))
                 else:
                     depl_cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", (attr, str(val), resource['id']))
-            logger.info("Resource with id %s  written" % resource['id'])
+            logger.info("Resource with id %s written" % resource['id'])
 
             #Deploy additional resources found in pkginfo
             if res_type == "std::Package":
@@ -130,6 +134,11 @@ def write_to_database(resource):
                     #The id was already written, now write extra path Attributes
                     for file in pkg_files:
                         depl_cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", ("path", file, resource['id']))
+
+            if res_type == "std::File" and resource['path'].endswith(".repo"):
+                #Add the repository data to the pkgdata database
+                with pkgdatata_db:
+                    pkg_cur = pkgdatata_db.cursor()
 
         else:
             logger.error("Tried to deploy resource but failed")
@@ -181,8 +190,15 @@ def finished_deploying(agent_res_dict):
 """
 The simulation itself
 """
+blocked_agents = {}
+for agent in agent_list:
+    blocked_agents[agent] = False
+
 #as long as not everything has been deployed
 while not finished_deploying(agent_to_res):
+    if all(blocked_agents.values()):
+        print("There are only resources left that have requirements and thus cannot be deployed.")
+        sys.exit()
     #deploy the resources without requirements in every agent
     for agent in agent_list:
         logger.info("Deploying resources for agent %s." % agent)
@@ -190,10 +206,15 @@ while not finished_deploying(agent_to_res):
         #by getting the list of resources without requirements, and deploying them
         res_wo_reqs = [write_to_database(res) for res in res_list if not res['requires']]
         attempted_deployed_resources = [res[0] for res in res_wo_reqs]
-        succesful_deployed_resources = [res[0] for res in res_wo_reqs if res[1]] 
+        succesful_deployed_resources = [res[0] for res in res_wo_reqs if res[1]]
+        if len(res_wo_reqs) == 0 and len(res_w_reqs) != 0:
+            blocked_agents[agent] = True
+        else:
+            blocked_agents[agent] = False
         for agent in agent_list:
             #and getting those resources who do have requirements.
             res_w_reqs = [x for x in agent_to_res[agent] if x not in attempted_deployed_resources]
+
             logger.info("Resources without requirements: %s \n Resources with requirements: %s" % (len(res_wo_reqs), len(res_w_reqs)))
             #Then remove the written resources from the requirements of the remaining resources
             for res in res_w_reqs:
