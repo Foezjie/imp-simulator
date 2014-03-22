@@ -1414,6 +1414,7 @@
 /etc/firewalld/services
 /etc/firewalld/zones
 /etc/mysql.conf.d
+/etc/init.d
 /etc/systemd
 /etc/systemd/user
 /etc/systemd/system
@@ -9182,3 +9183,6 @@
 /var/log/mail
 /var/log/ppp
 /var/log/audit
+/lib/
+/lib/systemd/
+/lib/systemd/system
