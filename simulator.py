@@ -198,6 +198,7 @@ for agent in agent_list:
 while not finished_deploying(agent_to_res):
     if all(blocked_agents.values()):
         print("There are only resources left that have requirements and thus cannot be deployed.")
+        print(agent_to_res)
         sys.exit()
     #deploy the resources without requirements in every agent
     for agent in agent_list:
@@ -207,7 +208,7 @@ while not finished_deploying(agent_to_res):
         res_wo_reqs = [write_to_database(res) for res in res_list if not res['requires']]
         attempted_deployed_resources = [res[0] for res in res_wo_reqs]
         succesful_deployed_resources = [res[0] for res in res_wo_reqs if res[1]]
-        if len(res_wo_reqs) == 0 and len(res_w_reqs) != 0:
+        if len(res_wo_reqs) == 0 and len(res_w_reqs) >= 0: #an agent that is finished deploying is also considered blocked
             blocked_agents[agent] = True
         else:
             blocked_agents[agent] = False
