@@ -212,7 +212,7 @@ while not finished_deploying(agent_to_res):
         res_wo_reqs = [write_to_database(res) for res in res_list if not res['requires']]
         attempted_deployed_resources = [res[0] for res in res_wo_reqs]
         succesful_deployed_resources = [res[0] for res in res_wo_reqs if res[1]]
-        if len(res_wo_reqs) == 0 and len(res_w_reqs) >= 0: #A resource that has finished deploying everything is also considered blocked
+        if len(res_wo_reqs) == 0 and len(res_w_reqs) >= 0: #an agent that is finished deploying is also considered blocked
             blocked_agents[agent] = True
         else:
             blocked_agents[agent] = False
