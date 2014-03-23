@@ -4,6 +4,9 @@ import sqlite3 as lite
 import json
 import logging
 import os
+import pprint
+
+pp = pprint.PrettyPrinter(indent=4)
 
 from Imp import app
 from Imp import resources
@@ -42,10 +45,10 @@ def valid_deployment(resource):
 
     with deployment_db:
         depl_cur = deployment_db.cursor()
-        depl_cur.execute("SELECT * FROM Resource")
-        #Alternative: select * from Attribute where name like 'path'
+        depl_cur.execute("select value from Attribute where name like 'path'")
+
         rows = depl_cur.fetchall()
-        directories = [resources.Id.parse_id(row[0]).get_attribute_value() for row in rows]
+        directories = [row[0] for row in rows]
 
     if res_type == "std::File":
         logger.info("Checking for valid File deployment")
@@ -91,7 +94,7 @@ def valid_deployment(resource):
     elif res_type == "std::Directory":
         logger.info("Checking for valid Directory deployment")
         parent_folder = os.path.dirname(resource['path'])
-        logger.info("Directories: %s" % directories)
+        #logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
             logger.error("Parent folder doesn't exist! Directory not deployed")
 
@@ -198,7 +201,9 @@ for agent in agent_list:
 while not finished_deploying(agent_to_res):
     if all(blocked_agents.values()):
         print("There are only resources left that have requirements and thus cannot be deployed.")
+        pp.pprint(agent_to_res)
         sys.exit()
+
     #deploy the resources without requirements in every agent
     for agent in agent_list:
         logger.info("Deploying resources for agent %s." % agent)
@@ -207,7 +212,7 @@ while not finished_deploying(agent_to_res):
         res_wo_reqs = [write_to_database(res) for res in res_list if not res['requires']]
         attempted_deployed_resources = [res[0] for res in res_wo_reqs]
         succesful_deployed_resources = [res[0] for res in res_wo_reqs if res[1]]
-        if len(res_wo_reqs) == 0 and len(res_w_reqs) != 0:
+        if len(res_wo_reqs) == 0 and len(res_w_reqs) >= 0: #A resource that has finished deploying everything is also considered blocked
             blocked_agents[agent] = True
         else:
             blocked_agents[agent] = False

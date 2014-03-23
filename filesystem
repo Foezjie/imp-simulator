@@ -9186,3 +9186,4 @@
 /lib/
 /lib/systemd/
 /lib/systemd/system
+/var/named/chroot/var/named/zones/master
