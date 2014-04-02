@@ -18,7 +18,7 @@ cfg_regex = re.compile(".*std::File.*")
 srv_regex = re.compile(".*std::Service.*")
 
 exceptions = ["network", "firewalld"] #Some services are standard in the Fedora installation and don't have a package in the model
-ignored_files = ['/etc/flens.d/collectd_in.json', '/etc/ssh/sshd_config']
+ignored_files = ['/etc/ssh/sshd_config']
 
 deployments = []
 
@@ -103,7 +103,7 @@ def do_measure():
                     if (res_name, res_agent) in deploy_order and packages_left(deploy_order[(res_name, res_agent)]):
                         if line_id in deploy_order[(res_name, res_agent)]:
                             deploy_order[(res_name, res_agent)].remove(line_id) #remove the package from the list
-                            #print("%s verwijderd uit deploy_order." % line_id)
+                            print("%s verwijderd uit deploy_order." % line_id)
                             deployed = deployed + 1
 
                 elif res_type == "std::File":
@@ -112,20 +112,21 @@ def do_measure():
                         if not packages_left(deploy_order[(pkg_name, res_agent)]):
                             if line_id in deploy_order[(pkg_name, res_agent)]:
                                 deploy_order[(pkg_name, res_agent)].remove(line_id) #remove the file from the list
-                                #print("%s verwijderd uit deploy_order." % line_id)
+                                print("%s verwijderd uit deploy_order." % line_id)
                                 deployed = deployed + 1
 
                 elif res_type == "std::Service":
                     if (res_name, res_agent) in deploy_order and not packages_left(deploy_order[(res_name, res_agent)]) and not files_left(deploy_order[(res_name, res_agent)]):
                         deploy_order.pop((res_name, res_agent), None)
-                        #print("Service %s volledig uitgerold." % line_id)
+                        print("Service %s volledig uitgerold." % line_id)
                         deployed = deployed + 1
+
         print("Deployed this run: %s" % deployed)
         pp.pprint(deploy_order)
         deployed = 0
 
     deployments.append(times)
 
-avg_time = timeit.timeit("do_measure()", setup="from __main__ import do_measure", number=3)/3
+avg_time = timeit.timeit("do_measure()", setup="from __main__ import do_measure", number=1)/1
 print("Avg time: %s" % avg_time)
 print("Deployments avg: %s\nDeployments %s" % (avg(deployments), deployments))

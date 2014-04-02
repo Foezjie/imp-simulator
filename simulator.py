@@ -41,7 +41,7 @@ init_database()
 
 def valid_deployment(resource):
     res_type = resources.Id.parse_id(resource['id']).get_entity_type()
-    logger.info("Resource: %s\nRes type: %s" % (resource,res_type))
+    logger.debug("Resource: %s\nRes type: %s" % (resource,res_type))
 
     with deployment_db:
         depl_cur = deployment_db.cursor()
@@ -51,8 +51,8 @@ def valid_deployment(resource):
         directories = [row[0] for row in rows]
 
     if res_type == "std::File":
-        logger.info("Checking for valid File deployment")
-        logger.info("File path: %s " % resource['path'])
+        logger.debug("Checking for valid File deployment")
+        logger.debug("File path: %s " % resource['path'])
         parent_folder = os.path.dirname(resource['path'])
         #logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
@@ -65,7 +65,7 @@ def valid_deployment(resource):
             #Workaround mainly for firewalld in the big json
             return True
         else:
-            logger.info("Checking for valid Service deployment")
+            logger.debug("Checking for valid Service deployment")
             srv_name = resources.Id.parse_id(resource['id']).get_attribute_value()
             with pkgdatata_db:
                 pkg_cur = pkgdatata_db.cursor()
@@ -88,15 +88,16 @@ def valid_deployment(resource):
                     return False
 
     elif res_type == "std::Package":
-        logger.info("Checking for valid Package deployment")
+        logger.debug("Checking for valid Package deployment")
         return True
 
     elif res_type == "std::Directory":
-        logger.info("Checking for valid Directory deployment")
+        logger.debug("Checking for valid Directory deployment")
         parent_folder = os.path.dirname(resource['path'])
         #logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
             logger.error("Parent folder doesn't exist! Directory not deployed")
+            return False
 
     return True
 
@@ -125,7 +126,7 @@ def write_to_database(resource):
 
             #Deploy additional resources found in pkginfo
             if res_type == "std::Package":
-                logger.info("Deploying files for package with id %s " % resource['id'])
+                logger.debug("Deploying files for package with id %s " % resource['id'])
                 with pkgdatata_db:
                     pkg_cur = pkgdatata_db.cursor()
                     pkg_cur.execute("SELECT * FROM pkgdata WHERE name LIKE (?)", (res_name,))
@@ -133,7 +134,7 @@ def write_to_database(resource):
                     pkg_files = [filenames_to_files(row[1], row[2]) for row in rows]
                     #flatten
                     pkg_files = [item for sublist in pkg_files for item in sublist]
-                    logger.info("Files in pkg: %s" % pkg_files)
+                    logger.debug("Files in pkg: %s" % pkg_files)
                     #The id was already written, now write extra path Attributes
                     for file in pkg_files:
                         depl_cur.execute("INSERT OR IGNORE INTO Attribute VALUES(?, ?, ?)", ("path", file, resource['id']))
@@ -185,7 +186,7 @@ def finished_deploying(agent_res_dict):
     for agent in agent_res_dict.keys():
         logger.info("Checking if agent %s has resources left to deploy." % agent)
         if any(agent_res_dict[agent] for agent in agent_to_res.keys()):
-            logger.info("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
+            logger.debug("Resources left for agent %s: %s " % (agent, agent_to_res[agent]))
             return False
 
     return True
@@ -201,7 +202,7 @@ for agent in agent_list:
 while not finished_deploying(agent_to_res):
     if all(blocked_agents.values()):
         print("There are only resources left that have requirements and thus cannot be deployed.")
-        pp.pprint(agent_to_res)
+        #pp.pprint(agent_to_res)
         sys.exit()
 
     #deploy the resources without requirements in every agent
@@ -220,14 +221,14 @@ while not finished_deploying(agent_to_res):
             #and getting those resources who do have requirements.
             res_w_reqs = [x for x in agent_to_res[agent] if x not in attempted_deployed_resources]
 
-            logger.info("Resources without requirements: %s \n Resources with requirements: %s" % (len(res_wo_reqs), len(res_w_reqs)))
+            logger.debug("Resources without requirements: %s \n Resources with requirements: %s" % (len(res_wo_reqs), len(res_w_reqs)))
             #Then remove the written resources from the requirements of the remaining resources
             for res in res_w_reqs:
                 for possible_req in succesful_deployed_resources:
                     logger.debug("Checking if %s can be removed from the requirements of %s." % (possible_req['id'], res['id']))
                     if possible_req['id'] in res['requires']:
                         res['requires'].remove(possible_req['id'])
-                        logger.info("Removed %s from the requirements of %s." % (possible_req, res))
+                        logger.debug("Removed %s from the requirements of %s." % (possible_req, res))
 
             #In the end we remove the newly deployed resources from the resource list of the agent.
             agent_to_res[agent] = res_w_reqs
