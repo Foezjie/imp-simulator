@@ -103,7 +103,7 @@ def valid_deployment(resource):
 
 #Converts two strings like "/usr/bin" and "test/test2" into a list containing "/usr/bin/test" and /usr/bin/test2"
 def filenames_to_files(prefix, filenames):
-    return [prefix + '/' + suffix for suffix in filenames.split('/')]
+    return [prefix + '/' + suffix for suffix in filenames.split('/')] + [prefix]
 
 """
 Write a resource to the database if it will be succesfully deployed.
