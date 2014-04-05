@@ -26,6 +26,14 @@ def avg(numbers):
     return float((sum(numbers)/len(numbers)))
 
 def read_order(json):
+    services = []
+    #get all services
+    for res in json:
+        if srv_regex.match(res['id']):
+            name = resources.Id.parse_id(res['id']).get_attribute_value()
+            if name not in services:
+                services.append(name)
+
     depl_order = {}
     file_to_name = {}
     for res in json:
@@ -42,10 +50,18 @@ def read_order(json):
                 file_reg = re.compile("std::File.*%s.*%s.*" % (res_agent, res['name'])) #Only add same agent resources
                 for file in json:
                     if file_reg.match(file['id']):
-                        if file['id'] in file_to_name:
-                            print("filetoname was already filled in. old: %s new: %s" % (file_to_name[file['id']], res['name']))
-                            file_to_name[file['id']].append((res['name'], res_agent))
-                        file_to_name[file['id']] = [(res['name'], res_agent)]
+                        file_path = resources.Id.parse_id(file['id']).get_attribute_value()
+                        earliest = (999, "")
+                        for srv in services: #First service to match is the one to go in file_to_name
+                            index = file_path.find(srv)
+                            if index < 0:
+                                continue
+                            elif index <= earliest[0]:
+                                earliest = (index, srv)
+                        if earliest[1] is not "":
+                            file_to_name[file['id']] = (earliest[1], res_agent)
+                        else:
+                            file_to_name[file['id']] = (res['name'], res_agent)
 
     return (depl_order, file_to_name)
 
@@ -59,12 +75,13 @@ def corresponding_name_agent(file_id, file_to_name):
     if file_id in file_to_name:
         return file_to_name[file_id]
     else:
-        return [(None, None)]
+        return (None, None)
 
 def do_measure():
     global deployments
     deploy_order = {}
-
+    
+    print("Removing old deployment db")
     subprocess.call("rm -f deployment.db", shell=True)
     print("-------------------\n   Starting new run \n-------------------")
 
@@ -84,11 +101,13 @@ def do_measure():
     deployed = 0
     while deploy_order:
         times = times + 1
+        #print("Removing old timing_log")
+        #subprocess.call("rm -f /tmp/timing_log", shell=True)
         print("starting simulator...")
-        subprocess.call("./simulator.py 2> /tmp/timing_log", shell=True)
+        subprocess.call("./simulator.py 2> /tmp/timing_log%s" % times, shell=True)
         print("simulating done.")
 
-        with open('/tmp/timing_log','r') as f:
+        with open('/tmp/timing_log%s' % times,'r') as f:
                 log = f.readlines()
         
         for line in log:
@@ -106,23 +125,23 @@ def do_measure():
                     if (res_name, res_agent) in deploy_order and packages_left(deploy_order[(res_name, res_agent)]):
                         if line_id in deploy_order[(res_name, res_agent)]:
                             deploy_order[(res_name, res_agent)].remove(line_id) #remove the package from the list
-                            print("%s verwijderd uit deploy_order." % line_id)
+                            print("%s verwijderd uit deploy_order van %s." % (line_id, res_name))
                             deployed = deployed + 1
 
                 elif res_type == "std::File":
-                    pkg_agent_list = corresponding_name_agent(line_id, file_to_name)
-                    for (pkg_name, agent) in pkg_agent_list:
-                        if pkg_name is not None and (pkg_name, res_agent) in deploy_order:
-                            if not packages_left(deploy_order[(pkg_name, res_agent)]):
-                                if line_id in deploy_order[(pkg_name, res_agent)]:
-                                    deploy_order[(pkg_name, res_agent)].remove(line_id) #remove the file from the list
-                                    print("%s verwijderd uit deploy_order." % line_id)
-                                    deployed = deployed + 1
+                    (pkg_name, agent) = corresponding_name_agent(line_id, file_to_name)
+                    if pkg_name is not None and (pkg_name, agent) in deploy_order:
+                        if not packages_left(deploy_order[(pkg_name, res_agent)]):
+                            if line_id in deploy_order[(pkg_name, agent)]:
+                                deploy_order[(pkg_name, agent)].remove(line_id) #remove the file from the list
+                                print("%s verwijderd uit deploy_order van %s." % (line_id, pkg_name))
+                                deployed = deployed + 1
 
                 elif res_type == "std::Service":
-                    if (res_name, res_agent) in deploy_order and not packages_left(deploy_order[(res_name, res_agent)]) and not files_left(deploy_order[(res_name, res_agent)]):
+                    #Deploy_order list must exist -and- be empty
+                    if (res_name, res_agent) in deploy_order and not deploy_order[(res_name, res_agent)]:
                         deploy_order.pop((res_name, res_agent), None)
-                        print("Service %s volledig uitgerold." % line_id)
+                        print("Service %s volledig uitgerold." % res_name)
                         deployed = deployed + 1
 
         print("Deployed this run: %s" % deployed)
