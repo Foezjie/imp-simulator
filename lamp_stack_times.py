@@ -81,6 +81,8 @@ def do_measure():
     global deployments
     deploy_order = {}
     
+    print("Removing old timing logs")
+    subprocess.call("rm -f /tmp/timing_log*", shell=True)
     print("Removing old deployment db")
     subprocess.call("rm -f deployment.db", shell=True)
     print("-------------------\n   Starting new run \n-------------------")
@@ -101,8 +103,6 @@ def do_measure():
     deployed = 0
     while deploy_order:
         times = times + 1
-        #print("Removing old timing_log")
-        #subprocess.call("rm -f /tmp/timing_log", shell=True)
         print("starting simulator...")
         subprocess.call("./simulator.py 2> /tmp/timing_log%s" % times, shell=True)
         print("simulating done.")

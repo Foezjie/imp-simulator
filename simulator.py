@@ -96,7 +96,7 @@ def valid_deployment(resource):
         parent_folder = os.path.dirname(resource['path'])
         #logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
-            logger.error("Parent folder doesn't exist! Directory not deployed")
+            logger.error("Parent folder doesn't exist! %s not deployed" % resource['id'])
             return False
 
     return True
