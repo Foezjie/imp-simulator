@@ -105,6 +105,13 @@ def valid_deployment(resource):
 def filenames_to_files(prefix, filenames):
     return [prefix + '/' + suffix for suffix in filenames.split('/')] + [prefix]
 
+def already_deployed(_id):
+    with deployment_db:
+        depl_cur = deployment_db.cursor()
+        depl_cur.execute("select exists(select Id from Resource where Id like (?))", (_id,))
+        res = depl_cur.fetchall()[0][0]
+        return res
+
 """
 Write a resource to the database if it will be succesfully deployed.
 Returns the tuple (resource, True) if the deployed would be succesful, (resource, False) if not
@@ -112,9 +119,15 @@ Returns the tuple (resource, True) if the deployed would be succesful, (resource
 def write_to_database(resource):
     res_type = resources.Id.parse_id(resource['id']).get_entity_type()
     res_name = resources.Id.parse_id(resource['id']).get_attribute_value()
+    
+    if already_deployed(resource['id']):
+        logger.info("%s was already deployed" % resource['id'])
+        logger.info("Resource with id %s written" % resource['id'])
+        return (resource, True)
 
     with deployment_db:
         depl_cur = deployment_db.cursor()
+
         #First check if there would be no errors during the deployment of this resource
         if valid_deployment(resource):
             for attr, val in resource.items():
@@ -201,7 +214,7 @@ for agent in agent_list:
 #as long as not everything has been deployed
 while not finished_deploying(agent_to_res):
     if all(blocked_agents.values()):
-        print("There are only resources left that have requirements and thus cannot be deployed.")
+        #print("There are only resources left that have requirements and thus cannot be deployed.")
         #pp.pprint(agent_to_res)
         sys.exit()
 
