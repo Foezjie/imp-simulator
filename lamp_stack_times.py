@@ -43,6 +43,7 @@ def read_order(json):
             if srv_regex.match(res['id']):
                 if res['name'] not in exceptions:
                     pkg_file_reg = re.compile("std::(Package|File).*%s.*%s.*" % (res_agent, res['name'])) #Only add same agent resources
+                    #depl_order[(res['name'], res_agent)] = res['requires']
                     depl_order[(res['name'], res_agent)] = [req['id'] for req in json if pkg_file_reg.match(req['id']) and not any([req['id'] in list for list in depl_order.values()]) and not resources.Id.parse_id(req['id']).get_attribute_value() in ignored_files] #Don't add a file twice on different services
             elif pkg_regex.match(res['id']):
                 if res['name'] == "cassandra12":
@@ -79,10 +80,7 @@ def corresponding_name_agent(file_id, file_to_name):
 
 def do_measure():
     global deployments
-    deploy_order = {}
     
-    print("Removing old timing logs")
-    subprocess.call("rm -f /tmp/timing_log*", shell=True)
     print("Removing old deployment db")
     subprocess.call("rm -f deployment.db", shell=True)
     print("-------------------\n   Starting new run \n-------------------")
@@ -92,6 +90,7 @@ def do_measure():
     """
     with open('test.json', 'r') as data_file:
         parsed_json = json.loads(data_file.read())
+
 
     random.shuffle(parsed_json)
     (deploy_order, file_to_name) = read_order(parsed_json)
@@ -103,6 +102,8 @@ def do_measure():
     deployed = 0
     while deploy_order:
         times = times + 1
+        #print("Removing old timing_log")
+        #subprocess.call("rm -f /tmp/timing_log", shell=True)
         print("starting simulator...")
         subprocess.call("./simulator.py 2> /tmp/timing_log%s" % times, shell=True)
         print("simulating done.")
