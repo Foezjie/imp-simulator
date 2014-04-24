@@ -121,8 +121,7 @@ def write_to_database(resource):
     res_name = resources.Id.parse_id(resource['id']).get_attribute_value()
     
     if already_deployed(resource['id']):
-        logger.info("%s was already deployed" % resource['id'])
-        logger.info("Resource with id %s written" % resource['id'])
+        logger.info("Resource with id %s already deployed" % resource['id'])
         return (resource, True)
 
     with deployment_db:

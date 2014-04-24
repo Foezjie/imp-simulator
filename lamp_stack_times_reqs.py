@@ -13,7 +13,7 @@ from Imp import resources
 
 
 
-deploy_re = re.compile(".*Resource with id\s(.*)\swritten")
+deploy_re = re.compile(".*Resource with id\s(.*)\s(written|already deployed)")
 
 deployments = []
 
@@ -33,7 +33,7 @@ def id_type(_id):
 #"All" in the sense of: it can deploy the model in one run.
 #Can't work with the normal id's because they contain a version number
 def read_order():
-    with open('test.json', 'r') as data:
+    with open('jsons/stack_rel_name.json', 'r') as data:
         req_json = json.loads(data.read())
 
     requires = {}
@@ -57,11 +57,11 @@ def do_measure():
     global deployments
     depl_list = []
 
-    #print("Removing old timing logs")
+    print("Removing old timing logs")
     subprocess.call("rm -f /tmp/timing_log*", shell=True)
-    #print("Removing old deployment db")
+    print("Removing old deployment db")
     subprocess.call("rm -f deployment.db", shell=True)
-    #print("-------------------\n   Starting new run \n-------------------")
+    print("-------------------\n   Starting new run \n-------------------")
 
     """
     Shuffle the json to simulate different deployments
@@ -79,9 +79,9 @@ def do_measure():
     while requires:
         deployed = 0
         times = times + 1
-        #print("starting simulator...")
+        print("starting simulator...")
         subprocess.call("./simulator.py 2> /tmp/timing_log%s" % times, shell=True)
-        #print("simulating done.")
+        print("simulating done.")
 
         with open('/tmp/timing_log%s' % times, 'r') as f:
                 log = f.readlines()
@@ -103,7 +103,7 @@ def do_measure():
 
         depl_list.append(deployed)
         #print("Deployed this run: %s" % deployed)
-        #pp.pprint(requires)
+        pp.pprint(requires)
     deployments.append(depl_list)
 
 
