@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 loghandler = logging.FileHandler('/tmp/simlog')
 logger.addHandler(loghandler)
 
-with open('test.json', 'r') as data_file:    
+with open('input.json', 'r') as data_file:    
     parsed_json = json.loads(data_file.read())
 
 filesystem = [line.strip() for line in open('filesystem')]
