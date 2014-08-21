@@ -54,7 +54,7 @@ def valid_deployment(resource):
         logger.debug("Checking for valid File deployment")
         logger.debug("File path: %s " % resource['path'])
         parent_folder = os.path.dirname(resource['path'])
-        #logger.info("Directories: %s" % directories)
+        logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
             logger.error("Parent folder doesn't exist! File %s not deployed" % resource['id'])
             return False
@@ -94,7 +94,7 @@ def valid_deployment(resource):
     elif res_type == "std::Directory":
         logger.debug("Checking for valid Directory deployment")
         parent_folder = os.path.dirname(resource['path'])
-        #logger.info("Directories: %s" % directories)
+        logger.info("Directories: %s" % directories)
         if not (parent_folder in filesystem or parent_folder in directories):
             logger.error("Parent folder doesn't exist! Directory not deployed")
             return False
@@ -213,8 +213,8 @@ for agent in agent_list:
 #as long as not everything has been deployed
 while not finished_deploying(agent_to_res):
     if all(blocked_agents.values()):
-        #print("There are only resources left that have requirements and thus cannot be deployed.")
-        #pp.pprint(agent_to_res)
+        print("There are only resources left that have requirements and thus cannot be deployed.")
+        pp.pprint(agent_to_res)
         sys.exit()
 
     #deploy the resources without requirements in every agent
